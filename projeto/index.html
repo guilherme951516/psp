@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PSP ISO Loader Test</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Consolas', 'Monaco', monospace;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 100%);
+            min-height: 100vh;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #00d4ff;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 30px;
+        }
+        
+        .upload-box {
+            background: rgba(0, 212, 255, 0.1);
+            border: 3px dashed #00d4ff;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+        
+        .upload-box:hover {
+            background: rgba(0, 212, 255, 0.2);
+            border-color: #00ff88;
+        }
+        
+        .upload-box.dragover {
+            background: rgba(0, 255, 136, 0.2);
+            border-color: #00ff88;
+        }
+        
+        .upload-icon { font-size: 48px; margin-bottom: 15px; }
+        .upload-text { font-size: 18px; color: #00d4ff; }
+        .upload-hint { font-size: 14px; color: #666; margin-top: 10px; }
+        
+        input[type="file"] { display: none; }
+        
+        .file-info {
+            background: rgba(0, 255, 136, 0.1);
+            border: 2px solid #00ff88;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .file-info.show { display: block; }
+        .file-info .name { color: #00ff88; font-weight: bold; }
+        .file-info .size { color: #888; }
+        
+        .output-box {
+            background: #000;
+            border: 2px solid #333;
+            border-radius: 10px;
+            padding: 20px;
+            min-height: 400px;
+            max-height: 600px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        
+        .output-box .success { color: #00ff88; }
+        .output-box .error { color: #ff4444; }
+        .output-box .info { color: #00d4ff; }
+        .output-box .warn { color: #ffaa00; }
+        
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .status {
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+        
+        .status.ready { background: #00ff88; color: #000; }
+        .status.loading { background: #ffaa00; color: #000; }
+        .status.error { background: #ff4444; color: #fff; }
+        
+        .buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        button.primary {
+            background: #00d4ff;
+            color: #000;
+        }
+        
+        button.secondary {
+            background: #333;
+            color: #fff;
+        }
+        
+        button:hover { transform: translateY(-2px); }
+        button:active { transform: translateY(0); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .loading-spinner.show { display: block; }
+        
+        .spinner {
+            border: 4px solid #333;
+            border-top: 4px solid #00d4ff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .commands {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+        }
+        
+        .commands h3 { color: #00d4ff; margin-bottom: 10px; }
+        .commands input {
+            width: calc(100% - 100px);
+            padding: 10px;
+            border: 2px solid #333;
+            border-radius: 5px;
+            background: #111;
+            color: #fff;
+            font-family: monospace;
+        }
+        .commands button { width: 90px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 PSP ISO Loader</h1>
+        <p class="subtitle">Teste de leitura de ISO/CSO para WebAssembly</p>
+        
+        <div class="upload-box" id="uploadBox">
+            <div class="upload-icon">📀</div>
+            <div class="upload-text">Arraste um arquivo ISO/CSO aqui</div>
+            <div class="upload-hint">ou clique para selecionar • Suporta: .iso, .cso</div>
+        </div>
+        
+        <input type="file" id="fileInput" accept=".iso,.cso,.bin">
+        
+        <div class="file-info" id="fileInfo">
+            <span class="name" id="fileName"></span>
+            <span class="size" id="fileSize"></span>
+        </div>
+        
+        <div class="loading-spinner" id="loading">
+            <div class="spinner"></div>
+            <div id="loadingText">Carregando...</div>
+        </div>
+        
+        <div class="status-bar">
+            <span class="status ready" id="status">✓ Pronto</span>
+            <div class="buttons">
+                <button class="secondary" onclick="clearOutput()">Limpar</button>
+            </div>
+        </div>
+        
+        <div class="output-box" id="output">Aguardando WebAssembly...</div>
+        
+        <div class="commands" id="commandsPanel" style="display:none;">
+            <h3>📂 Comandos</h3>
+            <div style="display:flex; gap:10px; margin-bottom:10px;">
+                <input type="text" id="dirPath" placeholder="/PSP_GAME" value="/">
+                <button class="primary" onclick="listDir()">Listar</button>
+            </div>
+            <div style="display:flex; gap:10px;">
+                <input type="text" id="filePath" placeholder="/PSP_GAME/PARAM.SFO">
+                <button class="primary" onclick="readFile()">Ler</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Estado
+        let wasmReady = false;
+        let isoLoaded = false;
+        
+        // Elementos
+        const uploadBox = document.getElementById('uploadBox');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const loading = document.getElementById('loading');
+        const loadingText = document.getElementById('loadingText');
+        const status = document.getElementById('status');
+        const output = document.getElementById('output');
+        const commandsPanel = document.getElementById('commandsPanel');
+        
+        // Configurar Module do Emscripten
+        var Module = {
+            print: function(text) {
+                appendOutput(text);
+            },
+            printErr: function(text) {
+                appendOutput('[ERRO] ' + text, 'error');
+            },
+            onRuntimeInitialized: function() {
+                wasmReady = true;
+                setStatus('ready', '✓ WebAssembly Pronto');
+                appendOutput('\n🎮 ISO Loader inicializado!\n', 'success');
+                appendOutput('Arraste ou selecione um arquivo ISO/CSO para testar.\n', 'info');
+            }
+        };
+        
+        function appendOutput(text, type = '') {
+            const span = document.createElement('span');
+            span.textContent = text + '\n';
+            if (type) span.className = type;
+            output.appendChild(span);
+            output.scrollTop = output.scrollHeight;
+        }
+        
+        function clearOutput() {
+            output.innerHTML = '';
+            appendOutput('Console limpo.\n', 'info');
+        }
+        
+        function setStatus(type, text) {
+            status.className = 'status ' + type;
+            status.textContent = text;
+        }
+        
+        function showLoading(show, text = 'Carregando...') {
+            loading.className = 'loading-spinner' + (show ? ' show' : '');
+            loadingText.textContent = text;
+        }
+        
+        function formatSize(bytes) {
+            if (bytes >= 1024 * 1024 * 1024) return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+            if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+            if (bytes >= 1024) return (bytes / 1024).toFixed(2) + ' KB';
+            return bytes + ' bytes';
+        }
+        
+        // Upload handlers
+        uploadBox.addEventListener('click', () => fileInput.click());
+        
+        uploadBox.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadBox.classList.add('dragover');
+        });
+        
+        uploadBox.addEventListener('dragleave', () => {
+            uploadBox.classList.remove('dragover');
+        });
+        
+        uploadBox.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadBox.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        async function handleFile(file) {
+            if (!wasmReady) {
+                alert('WebAssembly ainda não está pronto! Aguarde...');
+                return;
+            }
+            
+            // Validar extensão
+            const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+            if (!['.iso', '.cso', '.bin'].includes(ext)) {
+                alert('Formato não suportado! Use .iso ou .cso');
+                return;
+            }
+            
+            // Mostrar info do arquivo
+            fileName.textContent = '📀 ' + file.name;
+            fileSize.textContent = ' (' + formatSize(file.size) + ')';
+            fileInfo.classList.add('show');
+            
+            // Limpar output anterior
+            output.innerHTML = '';
+            
+            setStatus('loading', '⏳ Carregando...');
+            showLoading(true, 'Lendo arquivo... 0%');
+            
+            try {
+                // Ler arquivo com progresso
+                const buffer = await readFileWithProgress(file);
+                
+                showLoading(true, 'Escrevendo no MEMFS...');
+                
+                // Escrever no MEMFS do Emscripten
+                const data = new Uint8Array(buffer);
+                FS.writeFile('game.iso', data);
+                
+                appendOutput('✅ Arquivo carregado no MEMFS: ' + formatSize(data.length) + '\n', 'success');
+                
+                showLoading(true, 'Analisando ISO...');
+                
+                // Chamar função de teste
+                const result = Module.ccall('testISO', 'number', ['string'], ['game.iso']);
+                
+                showLoading(false);
+                
+                if (result === 0) {
+                    setStatus('ready', '✓ ISO Carregada');
+                    isoLoaded = true;
+                    commandsPanel.style.display = 'block';
+                } else {
+                    setStatus('error', '✗ Erro: ' + result);
+                }
+                
+            } catch (error) {
+                showLoading(false);
+                setStatus('error', '✗ Erro');
+                appendOutput('\n❌ ERRO: ' + error.message + '\n', 'error');
+                console.error(error);
+            }
+        }
+        
+        function readFileWithProgress(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                
+                reader.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        const percent = Math.round((e.loaded / e.total) * 100);
+                        showLoading(true, 'Lendo arquivo... ' + percent + '%');
+                    }
+                };
+                
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = () => reject(new Error('Falha ao ler arquivo'));
+                
+                reader.readAsArrayBuffer(file);
+            });
+        }
+        
+        // Comandos
+        function listDir() {
+            if (!isoLoaded) {
+                alert('Carregue uma ISO primeiro!');
+                return;
+            }
+            const path = document.getElementById('dirPath').value || '/';
+            appendOutput('\n', 'info');
+            Module.ccall('listDirectory', 'number', ['string'], [path]);
+        }
+        
+        function readFile() {
+            if (!isoLoaded) {
+                alert('Carregue uma ISO primeiro!');
+                return;
+            }
+            const path = document.getElementById('filePath').value;
+            if (!path) {
+                alert('Digite o caminho do arquivo!');
+                return;
+            }
+            Module.ccall('readFilePreview', 'number', ['string', 'number'], [path, 256]);
+        }
+    </script>
+    
+    <!-- Carregar WebAssembly compilado -->
+    <script src="testiso.js"></script>
+</body>
+</html>
